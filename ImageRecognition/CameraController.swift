@@ -88,14 +88,18 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
         
         //Resizing the frame to 299*299
         //The required size of the inceptionV3 model
+        guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            return
+        }
         
+        let ciImage = CIImage(cvPixelBuffer: imageBuffer)
+        let image = UIImage(ciImage: ciImage)
         
-        
+        UIGraphicsBeginImageContext(CGSize(width: 299, height: 299))
+        image.draw(in: CGRect(x: 0, y: 0, width: 299, height: 299))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()!
+        UIGraphicsEndImageContext()
     }
-    
-    
-    
-    
     
 }
 
