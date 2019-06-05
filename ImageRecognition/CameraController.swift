@@ -13,7 +13,7 @@ class CameraController: UIViewController {
     
     var captureSession = AVCaptureSession()
     var videoPreviewLayer: AVCaptureVideoPreviewLayer?
-    
+    var mlModel = Inceptionv3()
     
     
     override func viewDidLoad() {
@@ -73,10 +73,10 @@ class CameraController: UIViewController {
         descriptionLabel.text = "Looking for objects..."
         view.bringSubview(toFront: descriptionLabel)
     }
+
+    
+    
 }
-
-
-
 
 
 
@@ -99,7 +99,40 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
         image.draw(in: CGRect(x: 0, y: 0, width: 299, height: 299))
         let resizedImage = UIGraphicsGetImageFromCurrentImageContext()!
         UIGraphicsEndImageContext()
+        
+        //Converting UIImage to CVPixelBuffer
+        
+        let attrs = [kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue, kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue] as! CFDictionary
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(kCFAllocatorDefault, Int(resizedImage.size.width), Int(resizedImage.size.height), kCVPixelFormatType_32ARGB, attrs, &pixelBuffer)
+        guard (status == kCVReturnSuccess) else {
+            return
+        }
+        
+        
+        CVPixelBufferLockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+        let pixelData = CVPixelBufferGetBaseAddress(pixelBuffer!)
+        
+        let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(data: pixelData, width: Int(resizedImage.size.width), height: Int(resizedImage.size.height), bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer!), space: rgbColorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
+        
+        context?.translateBy(x: 0, y: resizedImage.size.height)
+        context?.scaleBy(x: 1.0, y: -1.0)
+        
+        UIGraphicsPushContext(context!)
+        resizedImage.draw(in: CGRect(x: 0, y: 0, width: resizedImage.size.width, height: resizedImage.size.height))
+        UIGraphicsPopContext()
+        
+        CVPixelBufferUnlockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+        
+        if let pixelBuffer = pixelBuffer, let output = try? mlModel.prediction(image: pixelBuffer) {
+            
+            DispatchQueue.main.async {
+                self.descriptionLabel.text = output.classLabel
+            }
+        }
     }
+    
     
 }
 
